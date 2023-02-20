@@ -1,0 +1,82 @@
+import React, { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { List } from "antd";
+import { createSlice, createAsyncThunk, configureStore } from "@reduxjs/toolkit";
+import axios from "axios";
+
+const pokemonSlice = createSlice({
+  name: "pokemon",
+  initialState: {
+    pokemons: [],
+    status: "idle",
+    error: null,
+  },
+  reducers: {},
+  extraReducers: {
+    [fetchPokemons.pending]: (state, action) => {
+      state.status = "loading";
+    },
+    [fetchPokemons.fulfilled]: (state, action) => {
+      state.status = "succeeded";
+      state.pokemons = action.payload;
+    },
+    [fetchPokemons.rejected]: (state, action) => {
+      state.status = "failed";
+      state.error = action.error.message;
+    },
+  },
+});
+
+const fetchPokemons = createAsyncThunk("pokemon/fetchPokemons", async () => {
+  const response = await axios.get("https://pokeapi.co/api/v2/pokemon?limit=100");
+  const pokemonList = response.data.results;
+  const pokemonData = await Promise.all(
+    pokemonList.map(async (pokemon) => {
+      const result = await axios.get(pokemon.url);
+      return result.data;
+    })
+  );
+  return pokemonData;
+});
+
+const store = configureStore({
+  reducer: {
+    pokemon: pokemonSlice.reducer,
+  },
+});
+
+function App() {
+  const dispatch = useDispatch();
+  const pokemons = useSelector((state) => state.pokemon.pokemons);
+  const status = useSelector((state) => state.pokemon.status);
+  const error = useSelector((state) => state.pokemon.error);
+
+  useEffect(() => {
+    dispatch(fetchPokemons());
+  }, [dispatch]);
+
+  if (status === "loading") {
+    return <div>Loading...</div>;
+  }
+
+  if (status === "failed") {
+    return <div>Error: {error}</div>;
+  }
+
+  return (
+    <div>
+      <List
+        grid={{ gutter: 16, column: 4 }}
+        dataSource={pokemons}
+        renderItem={(pokemon) => (
+          <List.Item>
+            <img src={pokemon.sprites.front_default} alt={pokemon.name} />
+            <div>{pokemon.name}</div>
+          </List.Item>
+        )}
+      />
+    </div>
+  );
+}
+
+export default App;
